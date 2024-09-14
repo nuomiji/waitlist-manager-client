@@ -14,6 +14,8 @@ function Waitlist() {
     const [position, setPosition] = useState<number | null>(null);
     const [status, setStatus] = useState<string>(NOT_QUEUED);
 
+    // this is needed so we fetch from sessionStorage on page refresh
+    // at this time, we don't have websockets so we need to refresh the page
     useEffect(() => {
         const storedCustomerId = sessionStorage.getItem('customerId');
         if (storedCustomerId) {
@@ -21,6 +23,46 @@ function Waitlist() {
             fetchCustomerDetails(Number(storedCustomerId));
         }
     }, []);
+
+    if (status === SEATED) {
+        return (
+            <div>
+                <h2>You are now checked in</h2>
+                <p>Please present this message to our staff</p>
+            </div>
+        )
+    }
+
+    if (customerId) {
+        return (
+            <div>
+                <h2>You are customer number {customerId}</h2>
+                {status === WAITING && (<p>There are {position} parties ahead of you in the queue.</p>)}
+                {status === TABLE_READY && (<p>You table is ready</p>)}
+                {status === TABLE_READY && (<button onClick={handleCheckIn}>Check In</button>)}
+            </div>
+        )
+    }
+
+    return (
+        <form onSubmit={handleSubmit}>
+            <input
+                type='text'
+                value={name}
+                onChange={e => setName(e.target.value)}
+                placeholder='Name'
+                required
+            />
+            <input
+                type="number"
+                value={partySize}
+                onChange={e => setPartySize(Number(e.target.value))}
+                min="1"
+                required
+            />
+            <button type='submit'>Join Waitlist</button>
+        </form>
+    )
 
     async function fetchCustomerDetails(id: number) {
         try {
@@ -51,26 +93,6 @@ function Waitlist() {
         }
     }
 
-    if (status === SEATED) {
-        return (
-            <div>
-                <h2>You are now checked in</h2>
-                <p>Please present this message to our staff</p>
-            </div>
-        )
-    }
-
-    if (customerId) {
-        return (
-            <div>
-                <h2>You are customer number {customerId}</h2>
-                {status === WAITING && (<p>There are {position} parties ahead of you in the queue.</p>)}
-                {status === TABLE_READY && (<p>You table is ready</p>)}
-                {status === TABLE_READY && (<button onClick={handleCheckIn}>Check In</button>)}
-            </div>
-        )
-    }
-
     async function handleCheckIn() {
         if (customerId) {
             try {
@@ -81,26 +103,6 @@ function Waitlist() {
             }
         }
     }
-
-    return (
-        <form onSubmit={handleSubmit}>
-            <input
-                type='text'
-                value={name}
-                onChange={e => setName(e.target.value)}
-                placeholder='Name'
-                required
-            />
-            <input
-                type="number"
-                value={partySize}
-                onChange={e => setPartySize(Number(e.target.value))}
-                min="1"
-                required
-            />
-            <button type='submit'>Join Waitlist</button>
-        </form>
-    )
 }
 
 export default Waitlist;
