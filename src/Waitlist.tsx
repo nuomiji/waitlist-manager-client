@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 
 function Waitlist() {
@@ -7,6 +7,23 @@ function Waitlist() {
     const [customerId, setCustomerId] = useState<number | null>(null);
     const [position, setPosition] = useState<number | null>(null);
 
+    useEffect(() => {
+        const storedCustomerId = sessionStorage.getItem('customerId');
+        if (storedCustomerId) {
+            setCustomerId(Number(storedCustomerId));
+            fetchCustomerDetails(Number(storedCustomerId));
+        }
+    }, []);
+
+    async function fetchCustomerDetails(id: number) {
+        try {
+            const res = await axios.get(`http://localhost:3001/api/customers/${id}`);
+            setPosition(res.data.position);
+        } catch (err) {
+            console.error(`Failed to fetch customer details!`);
+        }
+    }
+
     async function handleSubmit(e: React.FormEvent) {
         e.preventDefault();
 
@@ -14,7 +31,7 @@ function Waitlist() {
             const res = await axios.post('http://localhost:3001/api/customers', { name, partySize });
             if (res.data) {
                 setCustomerId(res.data.id);
-                localStorage.setItem('customerId', res.data.id); // currently we lose customerId on page reload. Need to implement useEffect next
+                sessionStorage.setItem('customerId', res.data.id); // currently we lose customerId on page reload. Need to implement useEffect next
                 setPosition(res.data.position);
             } else {
                 console.error(`Did not get data back from server! No customer # was fetched`);
