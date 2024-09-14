@@ -6,6 +6,7 @@ function Waitlist() {
     const [partySize, setPartySize] = useState(1);
     const [customerId, setCustomerId] = useState<number | null>(null);
     const [position, setPosition] = useState<number | null>(null);
+    const [isTableReady, setIsTableReady] = useState(false);
 
     useEffect(() => {
         const storedCustomerId = sessionStorage.getItem('customerId');
@@ -19,6 +20,8 @@ function Waitlist() {
         try {
             const res = await axios.get(`http://localhost:3001/api/customers/${id}`);
             setPosition(res.data.position);
+            // this is a workaround before we implement websockets
+            setIsTableReady(res.data.status === 'tableReady');
         } catch (err) {
             console.error(`Failed to fetch customer details!`);
         }
@@ -45,9 +48,15 @@ function Waitlist() {
         return (
             <div>
                 <h2>You are customer number {customerId}</h2>
-                <p>There are {position} parties ahead of you in the queue.</p>
+                {!isTableReady && (<p>There are {position} parties ahead of you in the queue.</p>)}
+                {isTableReady && (<p>You table is ready</p>)}
+                {isTableReady && (<button onClick={handleCheckIn}>Check In</button>)}
             </div>
         )
+    }
+
+    function handleCheckIn() {
+        console.log('We are checking in!! Yay food!');
     }
 
     return (
