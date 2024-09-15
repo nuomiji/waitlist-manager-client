@@ -165,6 +165,7 @@ function Waitlist() {
             try {
                 await axios.put(`http://localhost:3001/api/customers/${customerId}/check-in`);
                 setStatus(SEATED);
+                sessionStorage.removeItem('customerId');
             } catch (err) {
                 console.error('Failed to check in');
             }
