@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { io, Socket } from 'socket.io-client';
 
-// todo: make better types for these
+// Status types for the customer
 const NOT_QUEUED = 'notQueued';
 const WAITING = 'waiting';
 const TABLE_READY = 'tableReady';
@@ -10,33 +10,38 @@ const SEATED = 'seated';
 
 let socket: Socket | null = null;
 
+/**
+ * Waitlist Component
+ * 
+ * This component allows a user to join the waitlist, view their current status
+ * (waiting or table ready), and manage their spot in the waitlist. It also uses
+ * Socket.IO to listen for real-time updates when the customer's table is ready.
+ */
 function Waitlist() {
-    const [name, setName] = useState('');
-    const [partySize, setPartySize] = useState(1);
-    const [customerId, setCustomerId] = useState<number | null>(null);
-    const [position, setPosition] = useState<number | null>(null);
-    const [status, setStatus] = useState<string>(NOT_QUEUED);
-    const [isLoading, setIsLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
+    const [name, setName] = useState<string>(''); // Customer's name
+    const [partySize, setPartySize] = useState<number>(1); // Size of the party
+    const [customerId, setCustomerId] = useState<number | null>(null); // Unique ID of the customer
+    const [position, setPosition] = useState<number | null>(null); // Position in the waitlist
+    const [status, setStatus] = useState<string>(NOT_QUEUED); // Current status (waiting, table ready, etc.)
+    const [isLoading, setIsLoading] = useState<boolean>(false); // Loading state for form submission
+    const [error, setError] = useState<string | null>(null); // Error message for API requests
 
+    // Initialize socket connection on component mount and fetch customer data from sessionStorage
     useEffect(() => {
-        // initializes the Socket.io connection once when the component mounts, meaning once on page load
         if (!socket) {
             socket = io('http://localhost:3001');
         }
 
-        // fetch from sessionStorage on page refresh
         const storedCustomerId = sessionStorage.getItem('customerId');
         if (storedCustomerId && !isNaN(Number(storedCustomerId))) {
             fetchCustomerDetails(Number(storedCustomerId));
 
             socket.on('connect', () => {
-                console.log(`setting customerId ${storedCustomerId} with socket ${socket!.id} on socket reconnect`);
+                console.log(`Reconnected with socket ID: ${socket!.id}`);
                 socket!.emit('setCustomerId', { customerId: storedCustomerId });
             });
         }
 
-        // clean up socket connection when the component unmounts
         return () => {
             if (socket) {
                 socket.disconnect();
@@ -45,6 +50,7 @@ function Waitlist() {
         };
     }, []);
 
+    // Listen for table ready notification from the server
     useEffect(() => {
         if (socket && customerId) {
             socket.on('tableReady', () => {
@@ -56,47 +62,58 @@ function Waitlist() {
             if (socket) {
                 socket.off('tableReady');
             }
-        }
+        };
     }, [customerId]);
 
+    // Automatically dismiss error messages after 10 seconds
     useEffect(() => {
         if (error) {
             const timer = setTimeout(() => setError(null), 10000);
             return () => clearTimeout(timer);
-        } 
+        }
     }, [error]);
 
+    // Render view for seated customers
     if (status === SEATED) {
         return (
             <div>
                 <h2>You are now checked in</h2>
                 <p>Please present this message to our staff</p>
             </div>
-        )
+        );
     }
 
+    // Render view for customers who are already in the waitlist
     if (customerId) {
         return (
             <div>
                 <h2>You are customer number {customerId}</h2>
-                {status === WAITING && (<p>There are {position} {Number(position) <= 1 ? 'party' : 'parties'} ahead of you in the queue.</p>)}
-                {status === TABLE_READY && (<p>Your table is ready</p>)}
-                {(status === WAITING || status === TABLE_READY) && (<button onClick={handleLeaveWaitlist}> Leave Waitlist</button>)}
+                {status === WAITING && (
+                    <p>
+                        There are {position} {Number(position) <= 1 ? 'party' : 'parties'} ahead of you in the queue.
+                    </p>
+                )}
+                {status === TABLE_READY && <p>Your table is ready</p>}
+                {(status === WAITING || status === TABLE_READY) && (
+                    <button onClick={handleLeaveWaitlist}>Leave Waitlist</button>
+                )}
                 <br />
-                {status === TABLE_READY && (<button onClick={handleCheckIn}>Check In</button>)}
+                {status === TABLE_READY && <button onClick={handleCheckIn}>Check In</button>}
             </div>
-        )
+        );
     }
 
+    // Render form for customers to join the waitlist
     return (
         <div>
-            {error && (<p>{error}</p>)}
+            {error && <p>{error}</p>}
             <form onSubmit={handleSubmit}>
                 <input
                     type='text'
                     value={name}
                     onChange={e => setName(e.target.value)}
                     placeholder='Name'
+                    required
                 />
                 <input
                     type="number"
@@ -108,24 +125,30 @@ function Waitlist() {
                 <button type='submit'>{isLoading ? 'Loading...' : 'Join Waitlist'}</button>
             </form>
         </div>
-    )
+    );
 
+    /**
+     * Fetch customer details from the server using their ID
+     * @param {number} id - The customer ID
+     */
     async function fetchCustomerDetails(id: number) {
         try {
             const res = await axios.get(`http://localhost:3001/api/customers/${id}`);
             setPosition(res.data.position);
             setStatus(res.data.status);
             setCustomerId(id);
-            // console.log(`fetchCustomerDetails: Position ${res.data.position}, Status: ${res.data.status}`);
         } catch (err) {
             if (axios.isAxiosError(err)) {
-                setError(err.response?.data?.message || 'Failed to fetch customer details')
+                setError(err.response?.data?.message || 'Failed to fetch customer details');
             }
-            setError('Failed to fetch customer details')
-            console.error(`Failed to fetch customer details!`);
+            console.error('Failed to fetch customer details!');
         }
     }
 
+    /**
+     * Handles form submission to join the waitlist
+     * @param {React.FormEvent} e - Form submit event
+     */
     async function handleSubmit(e: React.FormEvent) {
         e.preventDefault();
         setIsLoading(true);
@@ -137,28 +160,25 @@ function Waitlist() {
                 setCustomerId(id);
                 sessionStorage.setItem('customerId', id);
                 setPosition(position);
-                // we can get back 2 types of status, waiting, or tableReady
                 setStatus(status);
 
-                // Only send customerId if we are waiting. Should we close the socket if table is ready?
+                // Send customerId to server if waiting
                 if (status === WAITING) {
-                    console.log(`emitting customerIdMapping with customerId ${id}`);
                     socket!.emit('setCustomerId', { customerId: id });
                 }
             } else {
-                console.error(`Did not get data back from server! No customerId fetched`);
+                console.error('No data returned from server!');
             }
         } catch (err: any) {
-            if (err.status === 400) {
-                setError(err.response?.data?.message);
-            } else {
-                setError(err.message);
-            }
+            setError(err.response?.data?.message || err.message);
         } finally {
             setIsLoading(false);
         }
     }
 
+    /**
+     * Handles customer check-in when their table is ready
+     */
     async function handleCheckIn() {
         if (customerId) {
             try {
@@ -171,24 +191,32 @@ function Waitlist() {
         }
     }
 
+    /**
+     * Handles customer request to leave the waitlist
+     */
     async function handleLeaveWaitlist() {
         if (customerId) {
             try {
                 await axios.delete(`http://localhost:3001/api/customers/${customerId}`);
-                
-                // reset states
-                setName('');
-                setPartySize(1);
-                setCustomerId(null);
-                setPosition(null);
-                setStatus(NOT_QUEUED);
-                setError(null);
+                resetWaitlistState();
             } catch (err) {
-                console.log(`Something went wrong in removing from the wailist`);
+                console.error('Error removing from the waitlist');
             }
         } else {
-            console.error(`Trying to leave waitlist when no customerId exist`);
+            console.error('No customerId found when attempting to leave waitlist');
         }
+    }
+
+    /**
+     * Resets the state when a customer leaves the waitlist
+     */
+    function resetWaitlistState() {
+        setName('');
+        setPartySize(1);
+        setCustomerId(null);
+        setPosition(null);
+        setStatus(NOT_QUEUED);
+        setError(null);
     }
 }
 
