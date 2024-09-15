@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { io } from 'socket.io-client';
+import { io, Socket } from 'socket.io-client';
 
 // todo: make better types for these
 const NOT_QUEUED = 'notQueued';
@@ -8,7 +8,7 @@ const WAITING = 'waiting';
 const TABLE_READY = 'tableReady';
 const SEATED = 'seated';
 
-let socket: any;
+let socket: Socket | null = null;
 
 function Waitlist() {
     const [name, setName] = useState('');
@@ -16,20 +16,23 @@ function Waitlist() {
     const [customerId, setCustomerId] = useState<number | null>(null);
     const [position, setPosition] = useState<number | null>(null);
     const [status, setStatus] = useState<string>(NOT_QUEUED);
+    const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
         // initializes the Socket.io connection once when the component mounts, meaning once on page load
-        socket = io('http://localhost:3001');
+        if (!socket) {
+            socket = io('http://localhost:3001');
+        }
 
         // fetch from sessionStorage on page refresh
         const storedCustomerId = sessionStorage.getItem('customerId');
-        if (storedCustomerId) {
+        if (storedCustomerId && !isNaN(Number(storedCustomerId))) {
             fetchCustomerDetails(Number(storedCustomerId));
 
             socket.on('connect', () => {
-                console.log(`setting customerId ${storedCustomerId} with socket ${socket.id} on socket reconnect`);
-                socket.emit('setCustomerId', { customerId: storedCustomerId });
+                console.log(`setting customerId ${storedCustomerId} with socket ${socket!.id} on socket reconnect`);
+                socket!.emit('setCustomerId', { customerId: storedCustomerId });
             });
         }
 
@@ -37,6 +40,7 @@ function Waitlist() {
         return () => {
             if (socket) {
                 socket.disconnect();
+                socket = null;
             }
         };
     }, []);
@@ -45,7 +49,7 @@ function Waitlist() {
         if (socket && customerId) {
             socket.on('tableReady', () => {
                 setStatus(TABLE_READY);
-            })
+            });
         }
 
         return () => {
@@ -54,6 +58,13 @@ function Waitlist() {
             }
         }
     }, [customerId]);
+
+    useEffect(() => {
+        if (error) {
+            const timer = setTimeout(() => setError(null), 10000);
+            return () => clearTimeout(timer);
+        } 
+    }, [error]);
 
     if (status === SEATED) {
         return (
@@ -95,7 +106,7 @@ function Waitlist() {
                     min="1"
                     required
                 />
-                <button type='submit'>Join Waitlist</button>
+                <button type='submit'>{isLoading ? 'Loading...' : 'Join Waitlist'}</button>
             </form>
         </div>
     )
@@ -108,26 +119,32 @@ function Waitlist() {
             setCustomerId(id);
             // console.log(`fetchCustomerDetails: Position ${res.data.position}, Status: ${res.data.status}`);
         } catch (err) {
+            if (axios.isAxiosError(err)) {
+                setError(err.response?.data?.message || 'Failed to fetch customer details')
+            }
+            setError('Failed to fetch customer details')
             console.error(`Failed to fetch customer details!`);
         }
     }
 
     async function handleSubmit(e: React.FormEvent) {
         e.preventDefault();
+        setIsLoading(true);
 
         try {
             const res = await axios.post('http://localhost:3001/api/customers', { name, partySize });
             if (res.data) {
-                setCustomerId(res.data.id);
-                sessionStorage.setItem('customerId', res.data.id);
-                setPosition(res.data.position);
+                const { id, position, status } = res.data;
+                setCustomerId(id);
+                sessionStorage.setItem('customerId', id);
+                setPosition(position);
                 // we can get back 2 types of status, waiting, or tableReady
-                setStatus(res.data.status);
+                setStatus(status);
 
                 // Only send customerId if we are waiting. Should we close the socket if table is ready?
-                if (res.data.status === WAITING) {
-                    console.log(`emitting customerIdMapping with customerId ${res.data.id}`);
-                    socket.emit('setCustomerId', { customerId: res.data.id });
+                if (status === WAITING) {
+                    console.log(`emitting customerIdMapping with customerId ${id}`);
+                    socket!.emit('setCustomerId', { customerId: id });
                 }
             } else {
                 console.error(`Did not get data back from server! No customerId fetched`);
@@ -138,6 +155,8 @@ function Waitlist() {
             } else {
                 setError(err.message);
             }
+        } finally {
+            setIsLoading(false);
         }
     }
 
