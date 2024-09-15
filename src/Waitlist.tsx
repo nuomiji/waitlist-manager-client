@@ -97,7 +97,6 @@ function Waitlist() {
                     value={name}
                     onChange={e => setName(e.target.value)}
                     placeholder='Name'
-                    required
                 />
                 <input
                     type="number"
