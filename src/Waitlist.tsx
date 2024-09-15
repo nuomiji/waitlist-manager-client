@@ -70,6 +70,8 @@ function Waitlist() {
                 <h2>You are customer number {customerId}</h2>
                 {status === WAITING && (<p>There are {position} {Number(position) <= 1 ? 'party' : 'parties'} ahead of you in the queue.</p>)}
                 {status === TABLE_READY && (<p>Your table is ready</p>)}
+                {(status === WAITING || status === TABLE_READY) && (<button onClick={handleLeaveWaitlist}> Leave Waitlist</button>)}
+                <br />
                 {status === TABLE_READY && (<button onClick={handleCheckIn}>Check In</button>)}
             </div>
         )
@@ -84,7 +86,7 @@ function Waitlist() {
                     value={name}
                     onChange={e => setName(e.target.value)}
                     placeholder='Name'
-                required
+                    required
                 />
                 <input
                     type="number"
@@ -147,6 +149,26 @@ function Waitlist() {
             } catch (err) {
                 console.error('Failed to check in');
             }
+        }
+    }
+
+    async function handleLeaveWaitlist() {
+        if (customerId) {
+            try {
+                await axios.delete(`http://localhost:3001/api/customers/${customerId}`);
+                
+                // reset states
+                setName('');
+                setPartySize(1);
+                setCustomerId(null);
+                setPosition(null);
+                setStatus(NOT_QUEUED);
+                setError(null);
+            } catch (err) {
+                console.log(`Something went wrong in removing from the wailist`);
+            }
+        } else {
+            console.error(`Trying to leave waitlist when no customerId exist`);
         }
     }
 }
