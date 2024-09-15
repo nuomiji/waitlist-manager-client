@@ -117,9 +117,14 @@ function Waitlist() {
                 setCustomerId(res.data.id);
                 sessionStorage.setItem('customerId', res.data.id); // currently we lose customerId on page reload. Need to implement useEffect next
                 setPosition(res.data.position);
-                setStatus('waiting');
-                console.log(`emitting customerIdMapping with customerId ${res.data.id}`);
-                socket.emit('setCustomerId', { customerId: res.data.id });
+                // we can get back 2 types of status, waiting, or tableReady
+                setStatus(res.data.status);
+                
+                // Only send customerId if we are waiting. Should we close the socket if table is ready?
+                if (res.data.status === WAITING) {
+                    console.log(`emitting customerIdMapping with customerId ${res.data.id}`);
+                    socket.emit('setCustomerId', { customerId: res.data.id });
+                }
             } else {
                 console.error(`Did not get data back from server! No customer # was fetched`);
             }
