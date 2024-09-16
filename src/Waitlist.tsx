@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { io, Socket } from 'socket.io-client';
+import './Waitlist.css'; // Import the CSS file
 
 // Status types for the customer
 const NOT_QUEUED = 'notQueued';
@@ -78,9 +79,10 @@ function Waitlist() {
     // Render view for seated customers
     if (status === SEATED) {
         return (
-            <div>
+            <div className="waitlist-container">
                 <h2>You are now checked in</h2>
                 <p>Please present this message to our staff</p>
+                <p>Refresh the page and join again as a new customer</p>
             </div>
         );
     }
@@ -88,27 +90,31 @@ function Waitlist() {
     // Render view for customers who are already in the waitlist
     if (customerId) {
         return (
-            <div>
+            <div className="waitlist-container">
                 <h2>You are customer number {customerId}</h2>
                 {status === WAITING && (
-                    <p>
-                        There are {position} parties ahead of you in the queue.
-                    </p>
+                    <p>There are {position} parties ahead of you in the queue.</p>
+                )}
+                {status === WAITING && (
+                    <p>Check In button will show up in real time.</p>
+                )}
+                {status === WAITING && (
+                    <p>If you would like to refresh your position, you can refresh the page.</p>
                 )}
                 {status === TABLE_READY && <p>Your table is ready</p>}
                 {(status === WAITING || status === TABLE_READY) && (
                     <button onClick={handleLeaveWaitlist}>Leave Waitlist</button>
                 )}
                 <br />
+                <br />
                 {status === TABLE_READY && <button onClick={handleCheckIn}>Check In</button>}
             </div>
         );
     }
 
-    // Render form for customers to join the waitlist
     return (
-        <div>
-            {error && <p>{error}</p>}
+        <div className="waitlist-container">
+            {error && <p className="error-message">{error}</p>}
             <form onSubmit={handleSubmit}>
                 <input
                     type='text'
@@ -122,9 +128,12 @@ function Waitlist() {
                     value={partySize}
                     onChange={e => setPartySize(Number(e.target.value))}
                     min="1"
+                    placeholder='Party Size'
                     required
                 />
-                <button type='submit'>{isLoading ? 'Loading...' : 'Join Waitlist'}</button>
+                <button type='submit' disabled={isLoading}>
+                    {isLoading ? 'Loading...' : 'Join Waitlist'}
+                </button>
             </form>
         </div>
     );
@@ -141,7 +150,9 @@ function Waitlist() {
             setCustomerId(id);
         } catch (err) {
             if (axios.isAxiosError(err)) {
+                resetWaitlistState();
                 setError(err.response?.data?.message || 'Failed to fetch customer details');
+                sessionStorage.removeItem('customerId');
             }
             console.error('Failed to fetch customer details!');
         }
@@ -168,8 +179,6 @@ function Waitlist() {
                 if (status === WAITING) {
                     socket!.emit('setCustomerId', { customerId: id });
                 }
-            } else {
-                console.error('No data returned from server!');
             }
         } catch (err: any) {
             setError(err.response?.data?.message || err.message);
@@ -204,8 +213,6 @@ function Waitlist() {
             } catch (err) {
                 console.error('Error removing from the waitlist');
             }
-        } else {
-            console.error('No customerId found when attempting to leave waitlist');
         }
     }
 
