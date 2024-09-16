@@ -8,6 +8,8 @@ const WAITING = 'waiting';
 const TABLE_READY = 'tableReady';
 const SEATED = 'seated';
 
+const SERVER_URL: string = process.env.REACT_APP_WAITLIST_SERVER_URL!;
+
 let socket: Socket | null = null;
 
 /**
@@ -29,7 +31,7 @@ function Waitlist() {
     // Initialize socket connection on component mount and fetch customer data from sessionStorage
     useEffect(() => {
         if (!socket) {
-            socket = io('http://localhost:3001');
+            socket = io(SERVER_URL);
         }
 
         const storedCustomerId = sessionStorage.getItem('customerId');
@@ -90,7 +92,7 @@ function Waitlist() {
                 <h2>You are customer number {customerId}</h2>
                 {status === WAITING && (
                     <p>
-                        There are {position} {Number(position) <= 1 ? 'party' : 'parties'} ahead of you in the queue.
+                        There are {position} parties ahead of you in the queue.
                     </p>
                 )}
                 {status === TABLE_READY && <p>Your table is ready</p>}
@@ -133,7 +135,7 @@ function Waitlist() {
      */
     async function fetchCustomerDetails(id: number) {
         try {
-            const res = await axios.get(`http://localhost:3001/api/customers/${id}`);
+            const res = await axios.get(`${SERVER_URL}/api/customers/${id}`);
             setPosition(res.data.position);
             setStatus(res.data.status);
             setCustomerId(id);
@@ -154,7 +156,7 @@ function Waitlist() {
         setIsLoading(true);
 
         try {
-            const res = await axios.post('http://localhost:3001/api/customers', { name, partySize });
+            const res = await axios.post(`${SERVER_URL}/api/customers`, { name, partySize });
             if (res.data) {
                 const { id, position, status } = res.data;
                 setCustomerId(id);
@@ -182,7 +184,7 @@ function Waitlist() {
     async function handleCheckIn() {
         if (customerId) {
             try {
-                await axios.put(`http://localhost:3001/api/customers/${customerId}/check-in`);
+                await axios.put(`${SERVER_URL}/api/customers/${customerId}/check-in`);
                 setStatus(SEATED);
                 sessionStorage.removeItem('customerId');
             } catch (err) {
@@ -197,7 +199,7 @@ function Waitlist() {
     async function handleLeaveWaitlist() {
         if (customerId) {
             try {
-                await axios.delete(`http://localhost:3001/api/customers/${customerId}`);
+                await axios.delete(`${SERVER_URL}/api/customers/${customerId}`);
                 resetWaitlistState();
             } catch (err) {
                 console.error('Error removing from the waitlist');
