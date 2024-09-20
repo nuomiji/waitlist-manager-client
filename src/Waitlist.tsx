@@ -115,7 +115,7 @@ function Waitlist() {
     return (
         <div className="waitlist-container">
             {error && <p className="error-message">{error}</p>}
-            <form onSubmit={handleSubmit}>
+            <form  data-testid="waitlist-form" onSubmit={handleSubmit}>
                 <input
                     type='text'
                     value={name}
@@ -164,6 +164,10 @@ function Waitlist() {
      */
     async function handleSubmit(e: React.FormEvent) {
         e.preventDefault();
+
+        console.log("Form submitted!!");
+        console.log(`name: ${name}, partySize: ${partySize}`);
+
         setIsLoading(true);
 
         try {
